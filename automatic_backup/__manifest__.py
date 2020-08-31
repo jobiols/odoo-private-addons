@@ -1,12 +1,9 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Automatic Backup (Dropbox, Google Drive, Amazon S3, SFTP)',
-    'version': '1.5.2',
+    'version': '11.0.0.0.0',
     'summary': 'Automatic Backup',
-    'author': 'Grzegorz Krukar (grzegorzgk1@gmail.com)',
-    'description': """
-    Automatic Backup
-    """,
+    'author': 'Grzegorz Krukar (grzegorzgk1@gmail.com), Jorge Obiols (jorge.obiols@gmail.com)',
     'data': [
         'data/data.xml',
         'views/automatic_backup.xml',
@@ -17,8 +14,6 @@
     ],
     'installable': True,
     'application': True,
-    'price': 20.00,
-    'currency': 'EUR',
 }
 
 #### HISTORY ####
