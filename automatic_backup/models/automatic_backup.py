@@ -57,34 +57,122 @@ class AutomaticBackup(models.Model):
 
     _name = 'automatic.backup'
     _description = 'Automatic Backup'
-    _inherit = ['mail.thread']
+    _inherit = 'mail.thread'
 
-    name = fields.Char(default='Automatic Backup')
-    automatic_backup_rule_ids = fields.One2many('ir.cron', 'automatic_backup_id', string='Automatic Backup Rule')
-    successful_backup_notify_emails = fields.Char(string='Successful Backup Notification')
-    failed_backup_notify_emails = fields.Char(string='Failed Backup Notification')
-    delete_old_backups = fields.Boolean(default=False)
+    name = fields.Char(
+        default='Automatic Backup'
+    )
+    automatic_backup_rule_ids = fields.One2many(
+        'ir.cron',
+        'automatic_backup_id',
+        string='Automatic Backup Rule'
+    )
+    successful_backup_notify_emails = fields.Char(
+        string='Successful Backup Notification'
+    )
+    failed_backup_notify_emails = fields.Char(
+        string='Failed Backup Notification'
+    )
+    delete_old_backups = fields.Boolean(
+        default=False
+    )
+    filename = fields.Char(
+        default="default_filename"
+    )
+    delete_days = fields.Integer(
+        string='Delete backups older than [days]',
+        default=30
+    )
 
     def default_filename(self):
         return self.env.cr.dbname
 
-    filename = fields.Char(default=default_filename)
-
-    @api.one
     @api.constrains('delete_days')
     def constrains_delete_days(self):
-        if self.delete_old_backups:
-            if self.delete_days is False or self.delete_days < 1:
-                raise exceptions.ValidationError(_('Minimal Delete Days = 1'))
-
-    delete_days = fields.Integer(string='Delete backups older than [days]', default=30)
+        for rec in self:
+            if rec.delete_old_backups:
+                if rec.delete_days is False or rec.delete_days < 1:
+                    raise exceptions.ValidationError(_('Minimal Delete Days = 1'))
 
 
 class Cron(models.Model):
 
     _inherit = 'ir.cron'
 
-    @api.model
+    automatic_backup_id = fields.Many2one(
+        'automatic.backup'
+    )
+    backup_type = fields.Selection(
+        [('dump', 'Database Only'),
+         ('zip', 'Database and Filestore')]
+    )
+    backup_destination = fields.Selection(
+        [('folder', 'Folder'),
+         ('google_drive', 'Google Drive')]
+
+        # estas formas de backup no estan probadas.
+        #  ('ftp', 'FTP'),
+        #  ('sftp', 'SFTP'),
+        #  ('dropbox', 'Dropbox'),
+        #  ('s3', 'Amazon S3')]
+    )
+    folder_path = fields.Char(
+    )
+    ftp_address = fields.Char(
+        string='URL'
+    )
+    ftp_port = fields.Integer(
+        string='Port'
+    )
+    ftp_login = fields.Char(
+        string='Login'
+    )
+    ftp_password = fields.Char(
+        string='Password'
+    )
+    ftp_path = fields.Char(
+        string='Path'
+    )
+    dropbox_authorize_url = fields.Char(
+        string='Authorize URL'
+    )
+    dropbox_authorize_url_rel = fields.Char(
+    )
+    dropbox_authorization_code = fields.Char(
+        string='Authorization Code'
+    )
+    dropbox_flow = fields.Integer(
+    )
+    dropbox_access_token = fields.Char(
+    )
+    dropbox_user_id = fields.Char(
+    )
+    dropbox_path = fields.Char(
+        default='/Odoo Automatic Backups/',
+        string='Backup Path'
+    )
+    s3_bucket_name = fields.Char(
+        string='Bucket name'
+    )
+    s3_username = fields.Char(
+        string='Username'
+    )
+    s3_access_key = fields.Char(
+        string='Access key'
+    )
+    s3_access_key_secret = fields.Char(
+        string='Acces key secret'
+    )
+
+    @api.constrains('folder_path')
+    def check_folder(self):
+        if self.folder_path.endswith('/'):
+            raise UserWarning('Backup Destination %s, must not end with "/"' %
+                              self.folder_path)
+
+        if not os.path.isdir(self.folder_path):
+            raise UserWarning('Invalid Backup Destination %s' % self.folder_path)
+
     def create(self, vals):
         if 'dropbox_authorize_url_rel' in vals:
             vals['dropbox_authorize_url'] = vals['dropbox_authorize_url_rel']
@@ -99,18 +187,16 @@ class Cron(models.Model):
             output.code = 'env[\'ir.cron\'].database_backup_cron_action(' + str(output.id) + ')'
         return output
 
-    @api.one
     def write(self, vals):
         if 'dropbox_authorize_url_rel' in vals:
             vals['dropbox_authorize_url'] = vals['dropbox_authorize_url_rel']
         return super(Cron, self).write(vals)
 
-    @api.one
     def unlink(self):
         # delete flow/auth files
-        self.env['ir.attachment'].browse(self.dropbox_flow).unlink()
-        output = super(Cron, self).unlink()
-        return output
+        for rec in self:
+            self.env['ir.attachment'].browse(rec.dropbox_flow).unlink()
+        return super(Cron, self).unlink()
 
     @api.model
     def search(self, args, offset=0, limit=None, order=None, count=False):
@@ -118,13 +204,14 @@ class Cron(models.Model):
             args += ['|', ('active', '=', True), ('active', '=', False)]
         return super(Cron, self).search(args, offset, limit, order, count=count)
 
-    @api.one
-    @api.constrains('backup_type', 'backup_destination')
+    @api.onchange('backup_type', 'backup_destination')
     def create_name(self):
-        self.name = 'Backup ' + self.backup_type + ' ' + self.backup_destination
+        for rec in self:
+            rec.name = 'Backup %s %s' % (rec.backup_type, rec.backup_destination)
 
     @api.onchange('backup_destination')
     def onchange_backup_destination(self):
+        self.ensure_one()
         if self.backup_destination == 'ftp':
             self.ftp_port = 21
 
@@ -166,9 +253,9 @@ class Cron(models.Model):
                 description='Automatic Backup File'
             )).id
 
-    @api.one
     @api.constrains('backup_destination', 'dropbox_authorization_code', 'dropbox_flow')
     def constrains_dropbox(self):
+        self.ensure_one()
         if self.backup_destination == 'sftp':
             if no_pysftp:
                 raise exceptions.Warning(_('Missing required pysftp python package\n'
@@ -205,13 +292,13 @@ class Cron(models.Model):
                 raise exceptions.Warning(_('Missing required boto3 python package\n'
                                            'https://pypi.python.org/pypi/boto3'))
 
-    @api.one
     def check_settings(self):
-        self.create_backup(True)
+        for rec in self:
+            rec.create_backup(True)
 
-    @api.one
     def backup_btn(self):
-        self.create_backup()
+        for rec in self:
+            rec.create_backup()
 
     def get_selection_field_value(self, field, key):
         my_model_obj = self
@@ -230,25 +317,35 @@ class Cron(models.Model):
         }
 
     def create_backup(self, check=False):
+        """ check, si es true no hace el backup, solo se chequea
+        """
         filename = ''
         if check is False:
-            backup_binary = odoo.service.db.dump_db(self.env.cr.dbname, None, self.backup_type)
+            backup_binary = odoo.service.db.dump_db(
+                self.env.cr.dbname, None, self.backup_type)
         else:
             backup_binary = tempfile.TemporaryFile()
             backup_binary.write(str.encode('Dummy File'))
             backup_binary.seek(0)
 
         # delete unused flow/auth files
-        self.env['ir.attachment'].search([('description', '=', 'Automatic Backup File'), ('res_id', '=', False)]).unlink()
+        domain = [('description', '=', 'Automatic Backup File'), ('res_id', '=', False)]
+        self.env['ir.attachment'].search(domain).unlink()
 
         if self.backup_destination == 'folder':
-            filename = self.folder_path + os.sep + self.automatic_backup_id.filename + '_' + \
-                       str(datetime.now()).split('.')[0].replace(':', '_') + '.' + self.backup_type
-            file_ = open(filename, 'wb')
-            file_.write(backup_binary.read())
-            file_.close()
+            filename = '%s%s%s_%s.%s' % (
+                self.folder_path,
+                os.sep,
+                self.automatic_backup_id.filename,
+                str(datetime.now()).split('.')[0].replace(':', '_').replace(' ', '@'),
+                self.backup_type
+            )
+            with open(filename, 'wb') as backup_file:
+                backup_file.write(backup_binary.read())
+
             if check is True:
                 os.remove(filename)
+
             if self.automatic_backup_id.delete_old_backups:
                 files = [f for f in listdir(self.folder_path) if isfile(join(self.folder_path, f))]
                 for backup in files:
@@ -491,32 +588,3 @@ class Cron(models.Model):
                     email_from=self.env['res.users'].browse(self.env.uid).email,
                     email_to=backup_rule.automatic_backup_id.failed_backup_notify_emails,
                 )).send()
-
-    automatic_backup_id = fields.Many2one('automatic.backup')
-    backup_type = fields.Selection([('dump', 'Database Only'),
-                                    ('zip', 'Database and Filestore')],
-                                   string='Backup Type')
-    backup_destination = fields.Selection([('folder', 'Folder'),
-                                           ('ftp', 'FTP'),
-                                           ('sftp', 'SFTP'),
-                                           ('dropbox', 'Dropbox'),
-                                           ('google_drive', 'Google Drive'),
-                                           ('s3', 'Amazon S3')],
-                                          string='Backup Destionation')
-    folder_path = fields.Char(string='Folder Path')
-    ftp_address = fields.Char(string='URL')
-    ftp_port = fields.Integer(string='Port')
-    ftp_login = fields.Char(string='Login')
-    ftp_password = fields.Char(string='Password')
-    ftp_path = fields.Char(string='Path')
-    dropbox_authorize_url = fields.Char(string='Authorize URL')
-    dropbox_authorize_url_rel = fields.Char()
-    dropbox_authorization_code = fields.Char(string='Authorization Code')
-    dropbox_flow = fields.Integer()
-    dropbox_access_token = fields.Char()
-    dropbox_user_id = fields.Char()
-    dropbox_path = fields.Char(default='/Odoo Automatic Backups/', string='Backup Path')
-    s3_bucket_name = fields.Char(string='Bucket name')
-    s3_username = fields.Char(string='Username')
-    s3_access_key = fields.Char(string='Access key')
-    s3_access_key_secret = fields.Char(string='Acces key secret')
