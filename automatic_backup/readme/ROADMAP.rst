@@ -1,0 +1,2 @@
+- Trabajando en mejorar documentacion
+- Proximamente backup a S3
