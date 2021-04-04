@@ -9,7 +9,7 @@ odoo.define('automatic.backup', function (require) {
                 .addClass('o_form_uri o_text_overflow')
                 .attr('href', this.value)
                 .attr('target', '_blank');
-        }
+        },
     });
 
 });

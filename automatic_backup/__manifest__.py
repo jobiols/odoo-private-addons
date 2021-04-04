@@ -21,7 +21,9 @@
     'name': 'Automatic Backup',
     'version': '13.0.1.0.0',
     'summary': 'Automatic Backup',
+    "development_status": "Beta",  # "Alpha|Beta|Production/Stable|Mature"
     'author': 'Jorge Obiols (jorge.obiols@gmail.com)',
+    'license': 'Other OSI approved licence',
     'data': [
         'data/data.xml',
         'views/automatic_backup.xml',

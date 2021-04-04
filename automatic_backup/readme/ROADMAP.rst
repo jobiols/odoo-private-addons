@@ -1,2 +1,2 @@
-- Trabajando en mejorar documentacion
-- Proximamente backup a S3
+- Improve doc
+- Develop a metohod to restore backups from folder and from S3

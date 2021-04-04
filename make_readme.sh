@@ -19,4 +19,4 @@ oca-gen-addon-readme \
 	--gen-html
 
 # ejecutar pylint en cada repositorio
-#find ./* -type d -exec pylint {} --load-plugins=pylint_odoo -d all -e odoolint -d C8101 \;
+find ./* -type d -exec pylint {} --load-plugins=pylint_odoo -d all -e odoolint -d C8101 \;

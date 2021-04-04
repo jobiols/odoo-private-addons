@@ -1,4 +1,6 @@
-13.0.1.0.0 (YYYY-MM-DD)
+13.0.1.0.0 (2021-04-04)
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-Commmit inicial
+Initial commit,
+backup to a folder and Amazon S3
+Beta status

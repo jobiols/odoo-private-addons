@@ -1,2 +1,2 @@
-Automated database backups from Odoo, locally
-Next version wil backup to AWS S3
+Automated database backups for Odoo,
+Send backup to a folder o to Amazon S3 Bucket

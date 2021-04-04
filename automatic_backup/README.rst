@@ -16,8 +16,8 @@ Automatic Backup
 
 |badge1| |badge2| 
 
-Automated database backups from Odoo, locally
-Next version wil backup to AWS S3
+Automated database backups for Odoo,
+Send backup to a folder o to Amazon S3 Bucket
 
 **Table of contents**
 
@@ -29,15 +29,27 @@ Installation
 
 To install this module, you need to:
 
-#. verify dependencies
+#. Verify dependencies in dependencies.txt
 #. Install the module
+#. limit_time_real parameter
+
+    When you've configured your Odoo instance to run with workers you should change the
+    default value of limit_time_real (as this defaults to 120). You can configure the value
+    in your odoo.conf to the appropriate number in case of a large database backup.
+    This is required when max_cron_threads > 0 to avoid worker timeout during the backup.
+
+#. review this... >> --load / server_wide_modules parameter
+    In V12, V13 and V14 Odoo will need the values 'base' and 'web' set if you use the
+    --load (or server_wide_modules) parameter. Without these values set you will get a
+    404 NOT FOUND from the backup module. For more information see
+    https://github.com/Yenthe666/auto_backup/issues/122
 
 Configuration
 =============
 
 To configure this module, you need to:
 
-#. Go to Settings / Technical / Automatic Backup...2416313
+#. Go to Settings / Technical / Automatic Backup
 
 .. figure:: https://raw.githubusercontent.com/jobiols/odoo-private-addons/13.0/automatic_backup/static/description/configure_backup.png
    :alt: Configurar backup
@@ -46,16 +58,18 @@ To configure this module, you need to:
 Known issues / Roadmap
 ======================
 
-- Trabajando en mejorar documentacion
-- Proximamente backup a S3
+- Improve doc
+- Develop a metohod to restore backups from folder and from S3
 
 Changelog
 =========
 
-13.0.1.0.0 (YYYY-MM-DD)
+13.0.1.0.0 (2021-04-04)
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-Commmit inicial
+Initial commit,
+backup to a folder and Amazon S3
+Beta status
 
 Bug Tracker
 ===========
