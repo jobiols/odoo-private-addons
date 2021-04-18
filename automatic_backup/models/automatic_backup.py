@@ -191,7 +191,7 @@ class Cron(models.Model):
 
         output = super().create(vals)
         if 'backup_type' in vals:
-            _ = "env['ir.cron'].database_backup_cron_action(' + str(output.id) + ')"
+            _ = "env['ir.cron'].database_backup_cron_action(%s)" % output.id
             output.code = _
         return output
 
@@ -348,22 +348,23 @@ class Cron(models.Model):
     def build_filename(self):
         """ Crear el filename del backup
         """
-        return '%s%s_%s.%s' % (
-            self.folder_path,
+        return '%s_%s.%s' % (
             self.automatic_backup_id.filename,
             datetime.now().strftime('%Y-%m-%d_%H-%M-%S'),
             self.backup_type)
 
-    def build_filename_s3(self):
-        return '%s_%s.%s' % (self.automatic_backup_id.filename,
-                             str(datetime.now()).split('.')[0].replace(':', '_'),
-                             self.backup_type)
+    def build_folder_filename(self):
+        """ Crear el filename del backup para folder
+        """
+        return '%s%s' % (
+            self.folder_path,
+            self.build_filename())
 
     def create_s3_backup(self, backup_binary):
         """ Manda el backup a un bucket s3 y hace limpieza
         """
         # nombre del archivo que va al bucket
-        filename = self.build_filename_s3()
+        filename = self.build_filename()
 
         # abrimos conexion a s3
         s3 = boto3.resource('s3',
@@ -390,7 +391,7 @@ class Cron(models.Model):
     def create_folder_backup(self, backup_binary, check=False):
         """ Manda el backup a un folder y hace la limpieza
         """
-        filename = self.build_filename()
+        filename = self.build_folder_filename()
         try:
             with open(filename, 'wb') as f:
                 f.write(backup_binary.read())
@@ -402,10 +403,10 @@ class Cron(models.Model):
         except (FileNotFoundError, PermissionError) as ex:
             if isinstance(ex, PermissionError):
                 raise UserError(_('Can not open folder %s. '
-                                    'Permission denied') % self.folder_path)
+                                  'Permission denied') % self.folder_path)
             if isinstance(ex, FileNotFoundError):
                 raise UserError(_('Can not access %s. '
-                                    'File or folder not found') % self.folder_path)
+                                  'File or folder not found') % self.folder_path)
 
         # Si hay que borrar chequeo por archivos obsoletos y los borro
         if self.automatic_backup_id.delete_old_backups:
@@ -426,8 +427,7 @@ class Cron(models.Model):
     def create_ftp_backup(self, backup_binary, check=False):
         """ Manda el backup a ftp y hace la limpieza
         """
-        filename = self.automatic_backup_id.filename + '_' + str(datetime.now()).split('.')[0].replace(':', '_') \
-                    + '.' + self.backup_type
+        filename = self.build_filename()
         ftp = ftplib.FTP()
         ftp.connect(self.ftp_address, self.ftp_port)
         ftp.login(self.ftp_login, self.ftp_password)
@@ -452,9 +452,7 @@ class Cron(models.Model):
     def create_sftp_backup(self, backup_binary, check=False):
         """ Manda el backup a sftp y hace la limpieza
         """
-        filename = self.automatic_backup_id.filename + '_' + str(datetime.now()).split('.')[0].replace(':', '_') \
-                    + '.' + self.backup_type
-
+        filename = self.build_filename()
         cnopts = pysftp.CnOpts()
         cnopts.hostkeys = None
         sftp = pysftp.Connection(self.ftp_address, username=self.ftp_login,
@@ -482,8 +480,7 @@ class Cron(models.Model):
     def create_dropbox_backup(self, backup_binary, check=False):
         """ Manda el backup a dropbox y hace la limpieza
         """
-        filename = self.automatic_backup_id.filename + '_' + str(datetime.now()).split('.')[0].replace(':', '_') \
-                    + '.' + self.backup_type
+        filename = self.build_filename()
         client = dropbox.Dropbox(self.dropbox_access_token)
         client.files_upload(backup_binary.read(), '/' + filename)
         if check is True:
@@ -505,9 +502,7 @@ class Cron(models.Model):
     def create_google_drive_backup(self, backup_binary, check=False):
         """ Manda el backup a google_drive y hace la limpieza
         """
-        filename = self.automatic_backup_id.filename + '_' + str(datetime.now()).split('.')[0].replace(':', '_') \
-                    + '.' + self.backup_type
-
+        filename = self.build_filename()
         ia = self.env['ir.attachment'].browse(self.dropbox_flow)
         gauth = pickle.loads(base64.b64decode(ia.datas))
         drive = GoogleDrive(gauth)
@@ -639,14 +634,18 @@ class Cron(models.Model):
 
     def file_delete_message(self, filename):
         msg = _('Old backup deleted!') + '<br/>'
-        msg += _('Backup Type: ') + self.get_selection_field_value('backup_type', self.backup_type) + '<br/>'
-        msg += _('Backup Destination: ') + self.get_selection_field_value('backup_destination',
-                                                                          self.backup_destination) + '<br/>'
+        msg += _('Backup Type: ') + self.get_selection_field_value(
+            'backup_type', self.backup_type) + '<br/>'
+        msg += _('Backup Destination: ') + self.get_selection_field_value(
+            'backup_destination', self.backup_destination) + '<br/>'
+
         if self.backup_destination == 'folder':
             msg += _('Folder Path: ') + self.folder_path + '<br/>'
+
         if self.backup_destination == 'ftp':
             msg += _('FTP Adress: ') + self.ftp_address + '<br/>'
             msg += _('FTP Path: ') + self.ftp_path + '<br/>'
+
         msg += _('Filename: ') + filename + '<br/>'
         self.env['mail.message'].create(dict(
             subject=_('Old backup deleted!'),
@@ -655,6 +654,7 @@ class Cron(models.Model):
             model='automatic.backup',
             res_id=self.automatic_backup_id.id,
         ))
+
         if self.automatic_backup_id.successful_backup_notify_emails:
             self.env['mail.mail'].create(dict(
                 subject=_('Old backup deleted!'),
@@ -665,23 +665,32 @@ class Cron(models.Model):
 
     @api.model
     def database_backup_cron_action(self, *args):
-        backup_rule = False
         try:
-            if len(args) != 1 or isinstance(args[0], int) is False:
+            if len(args) != 1 or not isinstance(args[0], int):
                 raise exceptions.ValidationError(_('Wrong method parameters'))
-            rule_id = args[0]
-            backup_rule = self.browse(rule_id)
+            backup_rule = self.browse(args[0])
+            a = 1/0
             backup_rule.create_backup()
+
         except Exception as e:
-            msg = _('Automatic backup failed!') + '<br/>'
-            msg += _('Backup Type: ') + backup_rule.get_selection_field_value('backup_type', backup_rule.backup_type) + '<br/>'
-            msg += _('Backup Destination: ') + backup_rule.get_selection_field_value('backup_destination', backup_rule.backup_destination) + '<br/>'
+            backup_type = backup_rule.get_selection_field_value(
+                'backup_type', backup_rule.backup_type)
+            backup_dest = backup_rule.get_selection_field_value(
+                'backup_destination', backup_rule.backup_destination)
+
+            msg = '%s<br/>' % _('Automatic backup failed!')
+            msg += '%s%s<br/>' % (_('Backup Type: '), backup_type)
+            msg += '%s%s<br/>' % (_('Backup Destination: '), backup_dest)
+
             if backup_rule.backup_destination == 'folder':
-                msg += _('Folder Path: ') + backup_rule.folder_path + '<br/>'
+                msg += '%s%s<br/>' % (_('Folder Path: '), backup_rule.folder_path)
+
             if backup_rule.backup_destination == 'ftp':
-                msg += _('FTP Adress: ') + backup_rule.ftp_address + '<br/>'
-                msg += _('FTP Path: ') + backup_rule.ftp_path + '<br/>'
-            msg += _('Exception: ') + str(e) + '<br/>'
+                msg += '%s%s<br/>' % (_('FTP Adress: '), backup_rule.ftp_address)
+                msg += '%s%s<br/>' % (_('FTP Path: '), backup_rule.ftp_path)
+
+            msg += '%s%s<br/>' % (_('Exception: '), str(e))
+
             self.env['mail.message'].create(dict(
                 subject=_('Automatic backup failed!'),
                 body=msg,
@@ -689,6 +698,7 @@ class Cron(models.Model):
                 model='automatic.backup',
                 res_id=backup_rule.automatic_backup_id.id,
             ))
+
             if backup_rule.automatic_backup_id.failed_backup_notify_emails:
                 self.env['mail.mail'].create(dict(
                     subject=_('Automatic backup failed!'),

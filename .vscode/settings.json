@@ -1,5 +1,6 @@
 {
     "python.linting.pylintEnabled": true,
     "python.linting.enabled": true,
-    "restructuredtext.confPath": ""
+    "restructuredtext.confPath": "",
+    "restructuredtext.languageServer.disabled": true
 }
