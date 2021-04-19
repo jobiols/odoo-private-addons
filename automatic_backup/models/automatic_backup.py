@@ -669,7 +669,6 @@ class Cron(models.Model):
             if len(args) != 1 or not isinstance(args[0], int):
                 raise exceptions.ValidationError(_('Wrong method parameters'))
             backup_rule = self.browse(args[0])
-            a = 1/0
             backup_rule.create_backup()
 
         except Exception as e:
