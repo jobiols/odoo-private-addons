@@ -418,7 +418,7 @@ class Cron(models.Model):
                     filedate = self.creation_time(backup)
                     delta = timedelta(days=self.automatic_backup_id.delete_days)
                     if filedate + delta < datetime.today():
-                        os.remove(backup)
+                        os.remove(self.folder_path + backup)
                         self.file_delete_message(self.folder_path + backup)
 
         # notificamos finalizacion del backup
