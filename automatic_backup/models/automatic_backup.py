@@ -346,17 +346,18 @@ class Cron(models.Model):
             if check is True:
                 os.remove(filename)
 
+            # No se puede usar la fecha del archivo porque en otros filesystems no anda
             if self.automatic_backup_id.delete_old_backups:
                 files = [f for f in listdir(self.folder_path) if isfile(join(self.folder_path, f))]
                 for backup in files:
-                    if re.match(backup_pattern, backup) is not None:
-                        px = len(backup) - 24
-                        if backup.endswith('.dump'):
-                            px -= 1
-                        filedate = date(int(backup[px+1:px+5]), int(backup[px+6:px+8]), int(backup[px+9:px+11]))
-                        if filedate + timedelta(days=self.automatic_backup_id.delete_days) < date.today():
-                            os.remove(self.folder_path + os.sep + backup)
-                            self.file_delete_message(backup)
+#                    if re.match(backup_pattern, backup) is not None:
+                    px = len(backup) - 24
+                    if backup.endswith('.dump'):
+                        px -= 1
+                    filedate = date(int(backup[px+1:px+5]), int(backup[px+6:px+8]), int(backup[px+9:px+11]))
+                    if filedate + timedelta(days=self.automatic_backup_id.delete_days) < date.today():
+                        os.remove(self.folder_path + os.sep + backup)
+                        self.file_delete_message(backup)
 
         if self.backup_destination == 'ftp':
             filename = self.automatic_backup_id.filename + '_' + str(datetime.now()).split('.')[0].replace(':', '_') \
