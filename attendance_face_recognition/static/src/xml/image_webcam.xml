@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template id="template" xml:space="preserve">
+
+    <t t-name="attendance_face_recognition.FieldBinaryImage" t-inherit="web.FieldBinaryImage" t-inherit-mode="extension" owl="1">
+        <xpath expr="//button[hasclass('o_select_file_button')]" position="after">        
+            <t t-if="widget.model === 'hr.employee.faces'">
+                <button class="fa fa-camera fa-lg float-center o_web_cam_button" title="WebCam" aria-label="WebCam"/>
+            </t>
+        </xpath>
+    </t>
+
+    <div t-name="WebCamDialog" id="WebCamModal">
+        <div class="container-fluid">
+            <div class="row">                                
+                <div class="col-12" id="videoContainer">
+                    <video id="video" style="width: 100%; max-height: 100%; box-sizing: border-box;" autoplay="1"/>
+                    <canvas id="image" style="display: none;"/>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+</template>
