@@ -28,7 +28,7 @@
     "author": "SAMS",
     "maintainer": "SAMS",
     "license" :  "Other proprietary",
-    "website": "https://www.sams.com.ar",
+    "website": "https:sams-ing.com",
     "images": ["images/attendance_face_recognition.png"],
     "category": "Employees",
     "depends": [
